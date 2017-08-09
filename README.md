@@ -8,7 +8,7 @@ datastore module for getto/flight by peburrows/diplomat
 
 ```
 echo $data
-{"key": <key>, "conditions": {"col": "val"}, "columns": ["col"]}
+# => {"key": <key>, "conditions": {"col": "val"}, "columns": ["col"]}
 
 docker run \
   -e FLIGHT_DATA="$data" \
