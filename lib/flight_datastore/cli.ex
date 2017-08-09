@@ -1,33 +1,22 @@
 defmodule FlightDatastore.CLI do
-  def main(args) do
-    {opts, args, _} = OptionParser.parse(args, strict: [file: :string])
+  def main(arguments) do
+    data = System.get_env("FLIGHT_DATA") |> Poison.decode!
+
+    {_opts, args, _} = OptionParser.parse(arguments)
     case args do
       ["find", kind | _] ->
-        case opts[:file] do
-          nil -> puts_error("data file no detected")
-          file ->
-            case File.read(file) do
-              {:error, message} -> puts_error(message)
-              {:ok, data} ->
-                case Poison.decode(data) do
-                  {:error, message} -> puts_error(inspect(message))
-                  {:error, message, data} -> puts_error(inspect({message, data}))
-                  {:ok, json} ->
-                    json = FlightDatastore.find(kind,json["key"],json["conditions"],json["columns"])
-                           |> Poison.encode!
-                    case File.write(file, json) do
-                      :ok -> nil
-                      {:error, message} -> puts_error(message)
-                    end
-                end
-            end
-        end
+        kind
+        |> FlightDatastore.find(data["key"],data["conditions"],data["columns"])
+        |> puts_result
 
-      _ -> puts_error("unknown command")
+      _ -> "unknown command: #{arguments |> inspect}" |> puts_error
     end
   end
 
+  defp puts_result(data) do
+    IO.puts(data |> Poison.encode!)
+  end
   defp puts_error(message) do
-    IO.puts(:stderr, "flight_datastore: [ERROR] #{message}")
+    IO.puts(:stderr, "#{__MODULE__}: [ERROR] #{message}")
   end
 end
