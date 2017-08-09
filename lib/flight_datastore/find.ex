@@ -53,7 +53,7 @@ defmodule FlightDatastore.Find do
       end
     end
   end
-  def properties_match?(entity, conditions) do
+  defp properties_match?(entity, conditions) do
     conditions
     |> Map.keys
     |> Enum.all?(fn col ->
