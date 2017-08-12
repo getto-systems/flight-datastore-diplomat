@@ -40,17 +40,11 @@ defmodule FlightDatastore.Find do
       iex> FlightDatastore.Find.check(nil, %{"unknown col" => "not matches"})
       nil
   """
+  def check(nil, _conditions), do: nil
+  def check(entity, nil), do: entity
   def check(entity, conditions) do
-    if entity do
-      case conditions do
-        nil -> entity
-        conditions ->
-          if entity |> properties_match?(conditions) do
-            entity
-          else
-            nil
-          end
-      end
+    if entity |> properties_match?(conditions) do
+      entity
     end
   end
   defp properties_match?(entity, conditions) do
@@ -87,19 +81,15 @@ defmodule FlightDatastore.Find do
       iex> FlightDatastore.Find.to_map(nil, nil)
       nil
   """
+  def to_map(nil, _columns), do: nil
+  def to_map(_entity, nil), do: %{}
   def to_map(entity, columns) do
-    if entity do
-      case columns do
-        nil -> %{}
-        columns ->
-          columns |> Enum.reduce(%{}, fn col, acc ->
-            if entity.properties[col] do
-              acc |> Map.put(col, entity.properties[col].value)
-            else
-              acc
-            end
-          end)
+    columns |> Enum.reduce(%{}, fn col, acc ->
+      if entity.properties[col] do
+        acc |> Map.put(col, entity.properties[col].value)
+      else
+        acc
       end
-    end
+    end)
   end
 end
