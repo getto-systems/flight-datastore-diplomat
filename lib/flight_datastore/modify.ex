@@ -64,20 +64,10 @@ defmodule FlightDatastore.Modify do
       iex> FlightDatastore.Modify.check(nil, %{"User" => %{"insert" => %{}}})
       false
   """
+  def check(nil,_scopes), do: false
+  def check([],_scopes), do: false
   def check(data,scopes) do
-    data
-    |> case do
-      nil -> false
-      [] -> false
-      arr ->
-        arr
-        |> Enum.all?(fn operate ->
-          case scopes[operate["kind"]] do
-            nil -> false
-            scope -> scope[operate["action"]]
-          end
-        end)
-    end
+    data |> Enum.all?(fn info -> scopes[info["kind"]][info["action"]] end)
   end
 
   @doc """
