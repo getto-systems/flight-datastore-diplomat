@@ -13,8 +13,8 @@ defmodule FlightDatastore.Modify do
 
   ## Examples
 
-      iex> FlightDatastore.Modify.to_scope_map(["User:insert", "Profile:update:nolog"])
-      %{"User" => %{"insert" => %{log: true}}, "Profile" => %{"update" => %{log: false}}}
+      iex> FlightDatastore.Modify.to_scope_map(["User:insert", "Profile:update:nolog:cols=name,password"])
+      %{"User" => %{"insert" => %{log: true}}, "Profile" => %{"update" => %{log: false, cols: ["name","password"]}}}
 
       iex> FlightDatastore.Modify.to_scope_map(["User:insert", "User:replace", "User:replace:nolog"])
       %{"User" => %{"insert" => %{log: true}, "replace" => %{log: false}}}
@@ -38,7 +38,10 @@ defmodule FlightDatastore.Modify do
   defp parse_scopes(scopes) do
     scopes |> Enum.reduce(%{}, fn term, acc ->
       case term do
-        "nolog" -> acc |> Map.put(:log, false)
+        "nolog" ->
+          acc |> Map.put(:log, false)
+        "cols=" <> cols ->
+          acc |> Map.put(:cols, cols |> String.split(","))
         _ -> acc
       end
     end)
@@ -58,6 +61,15 @@ defmodule FlightDatastore.Modify do
       iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update"}], %{"User" => %{"insert" => %{}}})
       false
 
+      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update", "properties" => %{"col" => "value"}}], %{"Profile" => %{"update" => %{"cols" => ["col"]}}})
+      true
+
+      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update", "properties" => %{"col" => "value"}}], %{"Profile" => %{"update" => %{"cols" => ["col","col2"]}}})
+      true
+
+      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update", "properties" => %{"unknown_col" => "value"}}], %{"Profile" => %{"update" => %{"cols" => ["col","col2"]}}})
+      false
+
       iex> FlightDatastore.Modify.check([], %{"User" => %{"insert" => %{}}})
       false
 
@@ -67,7 +79,17 @@ defmodule FlightDatastore.Modify do
   def check(nil,_scopes), do: false
   def check([],_scopes), do: false
   def check(data,scopes) do
-    data |> Enum.all?(fn info -> scopes[info["kind"]][info["action"]] end)
+    data
+    |> Enum.all?(fn info ->
+      case scopes[info["kind"]][info["action"]] do
+        nil -> false
+        %{"cols" => cols} ->
+          info["properties"]
+          |> Map.keys
+          |> Enum.all?(fn col -> cols |> Enum.member?(col) end)
+        _ -> true
+      end
+    end)
   end
 
   @doc """
@@ -75,8 +97,28 @@ defmodule FlightDatastore.Modify do
   """
   def execute(data) do
     data
+    |> fill_properties
     |> to_request
     |> commit
+  end
+
+  def fill_properties(data) do
+    data
+    |> Enum.map(fn info ->
+      unless ["key","properties"] |> Enum.all?(fn key -> info |> Map.has_key?(key) end) do
+        info
+      else
+        case Find.find_entity(info["kind"], info["key"]) do
+          nil -> info
+          entity ->
+            properties =
+              entity
+              |> Find.to_map(entity.properties |> Map.keys)
+              |> Map.merge(info["properties"])
+            %{ info | "properties" => properties }
+        end
+      end
+    end)
   end
 
   @doc """

@@ -62,7 +62,7 @@ docker run \
   getto/flight-datastore-diplomat \
   flight_datastore modify <kind> [<kind>...]
 
-# => {"col": <val>}
+# => ["inserted key","inserted key"]
 ```
 
 ## pull
