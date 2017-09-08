@@ -1,6 +1,7 @@
 defmodule FlightDatastore.CLI do
   def main(arguments) do
-    data = parse_data()
+    data = parse_data("FLIGHT_DATA")
+    credential = parse_data("FLIGHT_CREDENTIAL")
 
     {_opts, args, _} = OptionParser.parse(arguments)
     case args do
@@ -14,7 +15,7 @@ defmodule FlightDatastore.CLI do
 
       ["modify" | kinds] ->
         data
-        |> FlightDatastore.modify(kinds)
+        |> FlightDatastore.modify(kinds,credential)
         |> case do
           {:ok, result} -> result |> puts_result
           {:error, :not_allowed} -> "not allowed" |> puts_result(105)
@@ -27,8 +28,8 @@ defmodule FlightDatastore.CLI do
     end
   end
 
-  defp parse_data do
-    System.get_env("FLIGHT_DATA")
+  defp parse_data(key) do
+    System.get_env(key)
     |> Poison.decode!
     |> case do
       nil -> %{}

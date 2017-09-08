@@ -13,8 +13,8 @@ defmodule FlightDatastore.Modify do
 
   ## Examples
 
-      iex> FlightDatastore.Modify.to_scope_map(["User:insert", "Profile:update:nolog:cols=name,password"])
-      %{"User" => %{"insert" => %{log: true}}, "Profile" => %{"update" => %{log: false, cols: ["name","password"]}}}
+      iex> FlightDatastore.Modify.to_scope_map(["User:insert", "Profile:update:nolog:cols=name,password:samekey=loginID"])
+      %{"User" => %{"insert" => %{log: true}}, "Profile" => %{"update" => %{log: false, cols: ["name","password"], samekey: "loginID"}}}
 
       iex> FlightDatastore.Modify.to_scope_map(["User:insert", "User:replace", "User:replace:nolog"])
       %{"User" => %{"insert" => %{log: true}, "replace" => %{log: false}}}
@@ -42,6 +42,8 @@ defmodule FlightDatastore.Modify do
           acc |> Map.put(:log, false)
         "cols=" <> cols ->
           acc |> Map.put(:cols, cols |> String.split(","))
+        "samekey=" <> key ->
+          acc |> Map.put(:samekey, key)
         _ -> acc
       end
     end)
@@ -52,42 +54,64 @@ defmodule FlightDatastore.Modify do
 
   ## Examples
 
-      iex> FlightDatastore.Modify.check([%{"kind" => "User", "action" => "insert"}], %{"User" => %{"insert" => %{}}})
+      iex> FlightDatastore.Modify.check([%{"kind" => "User", "action" => "insert"}], %{"User" => %{"insert" => %{}}}, %{})
       true
 
-      iex> FlightDatastore.Modify.check([%{"kind" => "User", "action" => "update"}], %{"User" => %{"insert" => %{}}})
+      iex> FlightDatastore.Modify.check([%{"kind" => "User", "action" => "update"}], %{"User" => %{"insert" => %{}}}, %{})
       false
 
-      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update"}], %{"User" => %{"insert" => %{}}})
+      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update"}], %{"User" => %{"insert" => %{}}}, %{})
       false
 
-      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update", "properties" => %{"col" => "value"}}], %{"Profile" => %{"update" => %{"cols" => ["col"]}}})
+      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update", "properties" => %{"col" => "value"}}], %{"Profile" => %{"update" => %{"cols" => ["col"]}}}, %{})
       true
 
-      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update", "properties" => %{"col" => "value"}}], %{"Profile" => %{"update" => %{"cols" => ["col","col2"]}}})
+      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update", "properties" => %{"col" => "value"}}], %{"Profile" => %{"update" => %{"cols" => ["col","col2"]}}}, %{})
       true
 
-      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update", "properties" => %{"unknown_col" => "value"}}], %{"Profile" => %{"update" => %{"cols" => ["col","col2"]}}})
+      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update", "properties" => %{"unknown_col" => "value"}}], %{"Profile" => %{"update" => %{"cols" => ["col","col2"]}}}, %{})
       false
 
-      iex> FlightDatastore.Modify.check([], %{"User" => %{"insert" => %{}}})
+      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update", "key" => "some-id"}], %{"Profile" => %{"update" => %{"samekey" => "loginID"}}}, %{"loginID" => "some-id"})
+      true
+
+      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update", "key" => "other-id"}], %{"Profile" => %{"update" => %{"samekey" => "loginID"}}}, %{"loginID" => "some-id"})
       false
 
-      iex> FlightDatastore.Modify.check(nil, %{"User" => %{"insert" => %{}}})
+      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update", "key" => "some-id", "properties" => %{"col" => "value"}}], %{"Profile" => %{"update" => %{"cols" => ["col"], "samekey" => "loginID"}}}, %{"loginID" => "some-id"})
+      true
+
+      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update", "key" => "other-id", "properties" => %{"col" => "value"}}], %{"Profile" => %{"update" => %{"cols" => ["col"], "samekey" => "loginID"}}}, %{"loginID" => "some-id"})
+      false
+
+      iex> FlightDatastore.Modify.check([], %{"User" => %{"insert" => %{}}}, %{})
+      false
+
+      iex> FlightDatastore.Modify.check(nil, %{"User" => %{"insert" => %{}}}, %{})
       false
   """
-  def check(nil,_scopes), do: false
-  def check([],_scopes), do: false
-  def check(data,scopes) do
+  def check(nil,_scopes,_credential), do: false
+  def check([],_scopes,_credential), do: false
+  def check(data,scopes,credential) do
+    methods = [
+      {"cols", fn info,cols ->
+        info["properties"]
+        |> Map.keys
+        |> Enum.all?(fn col -> cols |> Enum.member?(col) end)
+      end},
+      {"samekey", fn info,name ->
+        credential |> Map.has_key?(name) && info["key"] == credential[name]
+      end},
+    ]
+
     data
     |> Enum.all?(fn info ->
       case scopes[info["kind"]][info["action"]] do
         nil -> false
-        %{"cols" => cols} ->
-          info["properties"]
-          |> Map.keys
-          |> Enum.all?(fn col -> cols |> Enum.member?(col) end)
-        _ -> true
+        scope ->
+          methods |> Enum.all?(fn {key,func} ->
+            !scope[key] || func.(info,scope[key])
+        end)
       end
     end)
   end
