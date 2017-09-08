@@ -23,9 +23,9 @@ defmodule FlightDatastore do
   then check permission to modify data
   and execute modify
   """
-  def modify(data,kinds) do
+  def modify(data,kinds,credential) do
     scopes = kinds |> Modify.to_scope_map
-    if data["data"] |> Modify.check(scopes) do
+    if data["data"] |> Modify.check(scopes,credential) do
       data["data"]
       |> Modify.execute
       |> case do
