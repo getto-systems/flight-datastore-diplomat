@@ -30,10 +30,15 @@ defmodule FlightDatastore.CLI do
 
   defp parse_data(key) do
     System.get_env(key)
-    |> Poison.decode!
     |> case do
       nil -> %{}
-      data -> data
+      raw ->
+        raw
+        |> Poison.decode!
+        |> case do
+          nil -> %{}
+          data -> data
+        end
     end
   end
 
