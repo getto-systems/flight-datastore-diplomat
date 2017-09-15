@@ -43,6 +43,12 @@ defmodule FlightDatastore.Modify do
       iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "update", "key" => "other-id", "properties" => %{"col" => "value"}}], %{"Profile" => %{"update" => %{"cols" => ["col"], "samekey" => "loginID"}}}, %{"loginID" => "some-id"})
       false
 
+      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "replace", "key" => "new-id", "old-key" => "some-id"}], %{"Profile" => %{"replace" => %{"samekey" => "loginID"}}}, %{"loginID" => "some-id"})
+      true
+
+      iex> FlightDatastore.Modify.check([%{"kind" => "Profile", "action" => "replace", "key" => "new-id", "old-key" => "other-id"}], %{"Profile" => %{"replace" => %{"samekey" => "loginID"}}}, %{"loginID" => "some-id"})
+      false
+
       iex> FlightDatastore.Modify.check([], %{"User" => %{"insert" => %{}}}, %{})
       false
 
@@ -59,7 +65,7 @@ defmodule FlightDatastore.Modify do
         |> Enum.all?(fn col -> cols |> Enum.member?(col) end)
       end},
       {"samekey", fn info,name ->
-        credential |> Map.has_key?(name) && info["key"] == credential[name]
+        credential |> Map.has_key?(name) && (info["old-key"] || info["key"]) == credential[name]
       end},
     ]
 
