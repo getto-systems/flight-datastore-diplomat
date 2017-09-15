@@ -25,13 +25,13 @@ defmodule FlightDatastore do
   """
   def modify(data,kinds,credential) do
     scopes = kinds |> Modify.to_scope_map
-    if data["data"] |> Modify.check(scopes,credential) do
-      data["data"]
+    if data |> Modify.check(scopes,credential) do
+      data
       |> Modify.execute
       |> case do
         {:ok, response} ->
           keys = response |> Modify.inserted_keys
-          data["data"] |> Modify.fill_keys(keys) |> Modify.log(scopes, data["operator"])
+          data |> Modify.fill_keys(keys) |> Modify.log(scopes, credential)
           {:ok, %{keys: keys}}
         {:error, status} ->
           case status.code do
