@@ -63,28 +63,36 @@ defmodule FlightDatastore.Find do
 
   ## Examples
 
-      iex> FlightDatastore.Find.to_map(%{properties: %{"col" => %{value: "val"}}}, ["col"])
+      iex> FlightDatastore.Find.to_map(%{properties: %{"col" => %{value: "val"}}}, ["col"], %{})
       %{"col" => "val"}
 
-      iex> FlightDatastore.Find.to_map(%{properties: %{"col" => %{value: "val"}}}, ["col","unknown"])
+      iex> FlightDatastore.Find.to_map(%{properties: %{"col" => %{value: "val"}}}, ["col","unknown"], %{})
       %{"col" => "val"}
 
-      iex> FlightDatastore.Find.to_map(%{properties: %{"col" => %{value: "val"}}}, ["unknown"])
+      iex> FlightDatastore.Find.to_map(%{properties: %{"col" => %{value: "val"}}}, ["col","unknown"], %{"exclude": ["col"]})
+      %{"col" => "val"}
+
+      iex> FlightDatastore.Find.to_map(%{properties: %{"col" => %{value: "val"}}}, ["unknown"], %{})
       %{}
 
-      iex> FlightDatastore.Find.to_map(%{properties: %{"col" => %{value: "val"}}}, [])
+      iex> FlightDatastore.Find.to_map(%{properties: %{"col" => %{value: "val"}}}, [], %{})
       %{}
 
-      iex> FlightDatastore.Find.to_map(%{properties: %{"col" => %{value: "val"}}}, nil)
+      iex> FlightDatastore.Find.to_map(%{properties: %{"col" => %{value: "val"}}}, nil, %{})
       %{}
 
-      iex> FlightDatastore.Find.to_map(nil, nil)
+      iex> FlightDatastore.Find.to_map(nil, nil, %{})
       nil
   """
-  def to_map(nil, _columns), do: nil
-  def to_map(_entity, nil), do: %{}
-  def to_map(entity, columns) do
-    columns |> Enum.reduce(%{}, fn col, acc ->
+  def to_map(entity, columns), do: to_map(entity, columns, %{})
+  def to_map(nil, _columns, _scope), do: nil
+  def to_map(_entity, nil, _scope), do: %{}
+  def to_map(entity, columns, scope) do
+    columns
+    |> Enum.filter(fn col ->
+      not ( (scope["exclude"] || []) |> Enum.member?(col) )
+    end)
+    |> Enum.reduce(%{}, fn col, acc ->
       if entity.properties[col] do
         acc |> Map.put(col, entity.properties[col].value)
       else

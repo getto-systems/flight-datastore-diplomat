@@ -14,11 +14,16 @@ echo $data
   "columns": ["col"]
 }
 
+echo $scope | base64 -d
+# => {
+  "exclude": ["col"]
+}
+
 docker run \
   -e FLIGHT_DATA="$data" \
   -e GCP_CREDENTIALS_JSON="$json" \
   getto/flight-datastore-diplomat \
-  flight_datastore find <kind>
+  flight_datastore find <kind> $scope
 
 # => {"col": <val>}
 ```
@@ -56,11 +61,22 @@ echo $data
   ]
 }
 
+echo $scope | base64 -d
+# => {
+  <kind>: {
+    "update": {
+      "cols": [col, col, ...]
+      "no-log": true,
+      "same-key": "loginID"
+    }
+  }
+}
+
 docker run \
   -e FLIGHT_DATA="$data" \
   -e GCP_CREDENTIALS_JSON="$json" \
   getto/flight-datastore-diplomat \
-  flight_datastore modify <kind> [<kind>...]
+  flight_datastore modify $scope
 
 # => ["inserted key","inserted key"]
 ```

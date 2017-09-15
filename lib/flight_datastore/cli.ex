@@ -5,17 +5,25 @@ defmodule FlightDatastore.CLI do
 
     {_opts, args, _} = OptionParser.parse(arguments)
     case args do
-      ["find", kind | _] ->
+      ["find", kind, scope | _] ->
         kind
-        |> FlightDatastore.find(data["key"],data["conditions"],data["columns"])
+        |> FlightDatastore.find(
+          data["key"],
+          data["conditions"],
+          data["columns"],
+          scope |> Base.decode64! |> Poison.decode!
+        )
         |> case do
           nil -> "not found" |> puts_result(104)
           entity -> entity |> puts_result
         end
 
-      ["modify" | kinds] ->
+      ["modify", scope | _] ->
         data
-        |> FlightDatastore.modify(kinds,credential)
+        |> FlightDatastore.modify(
+          scope |> Base.decode64! |> Poison.decode!,
+          credential
+        )
         |> case do
           {:ok, result} -> result |> puts_result
           {:error, :not_allowed} -> "not allowed" |> puts_result(105)
