@@ -9,47 +9,6 @@ defmodule FlightDatastore.Modify do
   alias FlightDatastore.Find
 
   @doc """
-  Convert kind scope list to kind scope map
-
-  ## Examples
-
-      iex> FlightDatastore.Modify.to_scope_map(["User:insert", "Profile:update:nolog:cols=name,password:samekey=loginID"])
-      %{"User" => %{"insert" => %{log: true}}, "Profile" => %{"update" => %{log: false, cols: ["name","password"], samekey: "loginID"}}}
-
-      iex> FlightDatastore.Modify.to_scope_map(["User:insert", "User:replace", "User:replace:nolog"])
-      %{"User" => %{"insert" => %{log: true}, "replace" => %{log: false}}}
-  """
-  def to_scope_map(kinds) do
-    defaults = %{
-      log: true,
-    }
-
-    kinds
-    |> Enum.reduce(%{}, fn kind_scope, acc ->
-      case kind_scope |> String.split(":") do
-        [kind, action | scopes] ->
-          scope = acc |> Map.get(kind, %{})
-          action_scope = scope |> Map.get(action, defaults) |> Map.merge(scopes |> parse_scopes)
-          acc |> Map.put(kind, scope |> Map.put(action, action_scope))
-        _ -> acc
-      end
-    end)
-  end
-  defp parse_scopes(scopes) do
-    scopes |> Enum.reduce(%{}, fn term, acc ->
-      case term do
-        "nolog" ->
-          acc |> Map.put(:log, false)
-        "cols=" <> cols ->
-          acc |> Map.put(:cols, cols |> String.split(","))
-        "samekey=" <> key ->
-          acc |> Map.put(:samekey, key)
-        _ -> acc
-      end
-    end)
-  end
-
-  @doc """
   Check permission to modify data
 
   ## Examples
@@ -256,7 +215,7 @@ defmodule FlightDatastore.Modify do
   def log(data,scopes,operator) do
     data
     |> Enum.each(fn info ->
-      if scopes[info["kind"]][info["action"]][:log] do
+      unless scopes[info["kind"]][info["action"]]["no-log"] do
         info |> rec(operator)
       end
     end)

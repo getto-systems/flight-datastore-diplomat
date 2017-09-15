@@ -11,10 +11,10 @@ defmodule FlightDatastore do
   and check conditions (return nil if check fails)
   and convert to Map
   """
-  def find(kind,key,conditions,columns) do
+  def find(kind,key,conditions,columns,scope) do
     Find.find_entity(kind,key)
     |> Find.check(conditions)
-    |> Find.to_map(columns)
+    |> Find.to_map(columns,scope)
   end
 
 
@@ -23,8 +23,7 @@ defmodule FlightDatastore do
   then check permission to modify data
   and execute modify
   """
-  def modify(data,kinds,credential) do
-    scopes = kinds |> Modify.to_scope_map
+  def modify(data,scopes,credential) do
     if data |> Modify.check(scopes,credential) do
       data
       |> Modify.execute
