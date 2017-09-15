@@ -215,7 +215,7 @@ defmodule FlightDatastore.Modify do
   def log(data,scopes,operator) do
     data
     |> Enum.each(fn info ->
-      unless scopes[info["kind"]][info["action"]]["no-log"] do
+      unless scopes[info["kind"]][info["action"]]["nolog"] do
         info |> rec(operator)
       end
     end)
