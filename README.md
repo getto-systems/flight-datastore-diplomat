@@ -66,8 +66,8 @@ echo $scope | base64 -d
   <kind>: {
     "update": {
       "cols": [col, col, ...]
-      "no-log": true,
-      "same-key": "loginID"
+      "nolog": true,
+      "samekey": "loginID"
     }
   }
 }
