@@ -5,6 +5,18 @@ defmodule FlightDatastore.CLI do
 
     {_opts, args, _} = OptionParser.parse(arguments)
     case args do
+      ["format-for-upload", kind | _] ->
+        data
+        |> Enum.map(fn info ->
+          %{
+            kind: kind,
+            action: :insert,
+            key: info["name"],
+            properties: info,
+          }
+        end)
+        |> puts_result
+
       ["find", kind, scope | _] ->
         kind
         |> FlightDatastore.find(
