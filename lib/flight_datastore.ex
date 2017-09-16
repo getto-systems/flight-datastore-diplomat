@@ -30,8 +30,9 @@ defmodule FlightDatastore do
       |> case do
         {:ok, response} ->
           keys = response |> Modify.inserted_keys
-          data |> Modify.fill_keys(keys) |> Modify.log(scopes, credential)
-          {:ok, %{keys: keys}}
+          filled = data |> Modify.fill_keys(keys)
+          filled |> Modify.log(scopes, credential)
+          {:ok, %{keys: keys, data: filled}}
         {:error, status} ->
           case status.code do
             5 -> {:error, :not_found,   status.message}
