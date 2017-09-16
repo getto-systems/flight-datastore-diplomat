@@ -118,7 +118,7 @@ docker run \
   -e FLIGHT_DATA="$data" \
   -e GCP_CREDENTIALS_JSON="$json" \
   getto/flight-datastore-diplomat \
-  flight_datastore format-for-upload <kind>
+  flight_datastore format-for-upload <kind> <path>
 
 # => [
   {
@@ -126,7 +126,8 @@ docker run \
     "action": "insert",
     "key": <file name>,
     "properties": {
-      "name": <file name>
+      "name": <file name>,
+      "path": <path>/<file name>
     }
   },
   ...
