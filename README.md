@@ -32,13 +32,56 @@ docker run \
 
 ```
 echo $data
+# => [
+  {
+    "action": "insert",
+    "kind": <kind>,
+    "properties": {"col": "val"}
+  },
+  {
+    "action": "replace",
+    "kind": <kind>,
+    "key": <key>,
+    "old-key": <old-key>,
+    "properties": {"col": "val"}
+  },
+  {
+    "action": "update"|"upsert",
+    "kind": <kind>,
+    "key": <key>,
+    "properties": {"col": "val"}
+  },
+  {
+    "action": "delete",
+    "kind": <kind>,
+    "key": <key>,
+  }
+]
+
+echo $scope | base64 -d
 # => {
-  "operator": <operator>,
+  <kind>: {
+    "update": {
+      "cols": [col, col, ...]
+      "nolog": true,
+      "samekey": "loginID"
+    }
+  }
+}
+
+docker run \
+  -e FLIGHT_DATA="$data" \
+  -e GCP_CREDENTIALS_JSON="$json" \
+  getto/flight-datastore-diplomat \
+  flight_datastore modify $scope
+
+# => {
+  "keys": ["inserted key"],
   "data": [
     {
       "action": "insert",
       "kind": <kind>,
-      "properties": {"col": "val"}
+      "properties": {"col": "val", "key": "inserted key"}
     },
     {
       "action": "replace",
@@ -60,25 +103,34 @@ echo $data
     }
   ]
 }
+```
 
-echo $scope | base64 -d
-# => {
-  <kind>: {
-    "update": {
-      "cols": [col, col, ...]
-      "nolog": true,
-      "samekey": "loginID"
-    }
-  }
-}
+### format-for-upload
+
+```
+echo $data
+# => [
+  {"name": <file name>},
+  ...
+]
 
 docker run \
   -e FLIGHT_DATA="$data" \
   -e GCP_CREDENTIALS_JSON="$json" \
   getto/flight-datastore-diplomat \
-  flight_datastore modify $scope
+  flight_datastore format-for-upload <kind>
 
-# => ["inserted key","inserted key"]
+# => [
+  {
+    "kind": <kind>,
+    "action": "insert",
+    "key": <file name>,
+    "properties": {
+      "name": <file name>
+    }
+  },
+  ...
+]
 ```
 
 ## pull
