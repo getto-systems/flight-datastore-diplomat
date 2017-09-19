@@ -128,26 +128,32 @@ defmodule FlightDatastore.Modify do
         "delete" = action ->
           [{
             :"#{action}",
-            Diplomat.Key.new(info["kind"],info["key"]),
+            to_key(info["kind"], info["key"]),
           }]
         "replace" ->
           [{
             :update,
-            info["properties"] |> Diplomat.Entity.new(info["kind"],info["old-key"]),
+            info["properties"] |> to_entity(info["kind"],info["old-key"]),
           },{
             :delete,
-            Diplomat.Key.new(info["kind"],info["old-key"]),
+            to_key(info["kind"], info["old-key"]),
           },{
             :insert,
-            info["properties"] |> Diplomat.Entity.new(info["kind"],info["key"]),
+            info["properties"] |> to_entity(info["kind"],info["key"]),
           }]
         action ->
           [{
             :"#{action}",
-            info["properties"] |> Diplomat.Entity.new(info["kind"],info["key"]),
+            info["properties"] |> to_entity(info["kind"],info["key"]),
           }]
       end
     end)
+  end
+  def to_key(kind,key) do
+    Diplomat.Key.new(kind,key)
+  end
+  def to_entity(properties,kind,key) do
+    properties |> Diplomat.Entity.new(kind,key)
   end
 
   def commit(request) do
