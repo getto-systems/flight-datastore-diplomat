@@ -16,7 +16,7 @@ defmodule FlightDatastore.CLI do
 
   defp format_for_upload(opts,data,_credential) do
     kind = opts["kind"]
-    path = opts["path"]
+    path = opts["path"] || ""
 
     data
     |> Enum.map(fn info ->
@@ -24,7 +24,7 @@ defmodule FlightDatastore.CLI do
         kind: kind,
         action: :insert,
         key: info["name"],
-        properties: info |> Map.put("path", [path,info["name"]] |> Path.join),
+        properties: info |> Map.put("path", [path,kind,info["name"]] |> Path.join),
       }
     end)
     |> puts_result
