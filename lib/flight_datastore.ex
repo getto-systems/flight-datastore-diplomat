@@ -34,7 +34,11 @@ defmodule FlightDatastore do
           filled |> Modify.log(scopes, credential)
           {:ok, %{keys: keys, data: filled}}
         {:error, status} ->
-          status |> to_error
+          case status.code do
+            5 -> {:error, :not_found,   status.message}
+            6 -> {:error, :conflict,    status.message}
+            _ -> {:error, :bad_request, status.message}
+          end
       end
     else
       {:error, :not_allowed}
@@ -42,30 +46,18 @@ defmodule FlightDatastore do
   end
 
   @doc """
-  parse file as data per line
-  then insert data
+  Generate key and Fill data
+  then insert data and output data
   """
-  def bulk_insert(data,kind,scope) do
-    [%{
-      "kind" => kind,
-      "action" => "insert",
-      "properties" => data |> BulkInsert.filter(scope["cols"]),
-    }]
-    |> Modify.execute
+  def bulk_insert(data,kind,keys,fill,info,out) do
+    data = data |> BulkInsert.fill(keys,fill,info)
+    data
+    |> BulkInsert.insert(kind,info)
     |> case do
-      {:ok, response} ->
-        {:ok, response |> Modify.inserted_keys}
-      {:error, status} ->
-        {:error, type, message} = status |> to_error
-        {:error, "#{type}: #{message}"}
-    end
-  end
-
-  defp to_error(status) do
-    case status.code do
-      5 -> {:error, :not_found,   status.message}
-      6 -> {:error, :conflict,    status.message}
-      _ -> {:error, :bad_request, status.message}
+      :ok ->
+        out |> IO.puts(data |> Poison.encode!)
+        :ok
+      :error -> :error
     end
   end
 end
