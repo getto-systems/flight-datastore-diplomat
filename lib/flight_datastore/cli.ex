@@ -6,29 +6,13 @@ defmodule FlightDatastore.CLI do
     credential = parse_data("FLIGHT_CREDENTIAL")
 
     case args do
-      ["format-for-upload", opts | _] -> opts |> parse_json |> format_for_upload(data,credential)
-      ["find",              opts | _] -> opts |> parse_json |> find(data,credential)
-      ["modify",            opts | _] -> opts |> parse_json |> modify(data,credential)
-      ["bulk-insert",       opts | _] -> opts |> parse_json |> bulk_insert(data,credential)
+      ["find",        opts | _] -> opts |> parse_json |> find(data,credential)
+      ["modify",      opts | _] -> opts |> parse_json |> modify(data,credential)
+      ["upload",      opts | _] -> opts |> parse_json |> upload(data,credential)
+      ["bulk-insert", opts | _] -> opts |> parse_json |> bulk_insert(data,credential)
 
       _ -> "unknown command: #{arguments |> inspect}" |> puts_error
     end
-  end
-
-  defp format_for_upload(opts,data,_credential) do
-    kind = opts["kind"]
-    path = opts["path"] || ""
-
-    data
-    |> Enum.map(fn info ->
-      %{
-        kind: kind,
-        action: :insert,
-        key: info["name"],
-        properties: info |> Map.put("path", [path,kind,info["name"]] |> Path.join),
-      }
-    end)
-    |> puts_result
   end
 
   defp find(opts,data,_credential) do
@@ -62,97 +46,98 @@ defmodule FlightDatastore.CLI do
     end
   end
 
-  defp bulk_insert(opts,data,_credential) do
-    kind = opts["kind"]
-    scope = opts["scope"]
-    input = opts["input"]
-    output = opts["output"]
+  defp upload(_opts,data,credential) do
+    kind = data |> Enum.reduce(nil,fn info,_acc -> info["kind"] end)
+    cols = data |> Enum.reduce([],fn info,_acc -> info |> Map.keys end)
 
     data
-    |> Enum.reduce([], fn info, acc ->
-      ok_result  = open_output(output,"ok",   info["file"]["name"])
-      err_result = open_output(output,"error",info["file"]["name"])
-
-      data = %{
-        data: info,
+    |> Enum.map(fn info ->
+      %{
+        "kind" => info["kind"],
+        "action" => "insert",
+        "key" => info["name"],
+        "properties" => info,
       }
+    end)
+    |> FlightDatastore.modify(%{
+      kind => %{
+        "insert" => %{
+          "cols" => cols,
+        },
+      },
+    },credential)
+    |> case do
+      {:ok, result} ->
+        result.data
+        |> Enum.map(fn entity -> entity["properties"] end)
+        |> puts_result
+      {:error, :not_allowed} -> "not allowed" |> puts_result(105)
+      {:error, :bad_request, message} -> "bad request: #{message}" |> puts_result(100)
+      {:error, :not_found,   message} -> "not found: #{message}"   |> puts_result(104)
+      {:error, :conflict,    message} -> "conflict: #{message}"    |> puts_result(109)
+    end
+  end
 
-      case {ok_result,err_result} do
-        {{:ok,ok},{:ok,err}} ->
-          path = [input,info["file"]["name"]] |> Path.join
-          path
-          |> File.open
+  defp bulk_insert(opts,data,_credential) do
+    src = opts["src"]
+    dest = opts["dest"]
+    kind = opts["kind"]
+    keys = opts["keys"]
+    fill = opts["fill"]
+
+    data
+    |> Enum.map(fn info ->
+      case open_output(dest,info["name"]) do
+        {:ok,out} ->
+          [src,info["name"]]
+          |> Path.join
+          |> File.open([:utf8])
           |> case do
-            {:error, message} ->
-              [data |> Map.merge(%{
-                status: :abort,
-                message: "failed open input file: #{message} [#{path}]",
-              }) | acc]
             {:ok, file} ->
-              file
+              result = file
               |> IO.stream(:line)
-              |> Stream.with_index
-              |> Enum.each(fn {line,i} ->
+              |> Enum.reduce(true, fn line, acc ->
                 line
                 |> parse_json
-                |> FlightDatastore.bulk_insert(kind,scope)
+                |> FlightDatastore.bulk_insert(kind,keys,fill,info,out)
                 |> case do
-                  {:ok, keys}       -> ok  |> puts_file(%{line: i, data: info, keys: keys})
-                  {:error, message} -> err |> puts_file(%{line: i, data: info, message: message})
+                  :ok -> acc and true
+                  :error -> false
                 end
               end)
 
               file |> File.close
+              out  |> File.close
+              {:ok, result}
 
-              [data |> Map.merge(%{
-                status: :processed,
-              }) | acc]
+            error -> error
           end
-
-        _ ->
-          message = case {ok_result,err_result} do
-            {{:error,ok_message},{:error,err_message}} -> "#{ok_message} / #{err_message}"
-            {{:error,message},_} -> message
-            {_,{:error,message}} -> message
-          end
-          [data |> Map.merge(%{
-            status: :abort,
-            message: message,
-          }) | acc]
+        error -> error
       end
       |> case do
-        result ->
-          ok_result  |> elem(1) |> File.close
-          err_result |> elem(1) |> File.close
-          result
+        {:ok, result} ->
+          if result do
+            info
+          else
+            info |> Map.put(:bulk_insert_error, info |> FlightDatastore.BulkInsert.error_kind)
+          end
+        {:error, message} -> message |> puts_error
       end
     end)
-    |> case do
-      result ->
-        %{
-          data: result |> Enum.reverse,
-          input: input,
-          output: output,
-        }
-        |> puts_result
-    end
+    |> puts_result
   end
-  defp open_output(output,type,file) do
-    path = [output,type,file] |> Path.join
+  defp open_output(output,file) do
+    path = [output,file] |> Path.join
     case File.mkdir_p(path |> Path.dirname) do
       {:error, message} -> {:error, "failed mkdir_p: #{message} [#{path}]"}
       _ ->
         path
-        |> File.open([:write])
+        |> File.open([:write, :utf8])
         |> case do
           {:error, message} -> {:error, "failed open file: #{message} [#{path}]"}
           result -> result
         end
     end
-  end
-  defp puts_file(handle,data) do
-    handle
-    |> IO.puts(data |> Poison.encode!)
   end
 
   defp parse_data(key) do
