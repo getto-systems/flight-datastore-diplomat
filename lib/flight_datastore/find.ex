@@ -3,12 +3,28 @@ defmodule FlightDatastore.Find do
   Find entity utils
   """
 
+  def to_key(namespace,kind,key) do
+    Diplomat.Key.new(kind,key)
+    |> case do
+      key -> %{ key | namespace: namespace }
+    end
+  end
+  def to_entity(properties,namespace,kind,key) do
+    properties
+    |> Diplomat.Entity.new(kind,key)
+    |> case do
+      entity ->
+        key = %{ entity.key | namespace: namespace }
+        %{ entity | key: key }
+    end
+  end
+
   @doc """
   Find by Diplomat
   return nil if error or not exists
   """
-  def find_entity(kind,key) do
-    Diplomat.Key.new(kind,key)
+  def find_entity(namespace,kind,key) do
+    to_key(namespace,kind,key)
     |> Diplomat.Key.get
     |> case do
       {:error, _} -> []

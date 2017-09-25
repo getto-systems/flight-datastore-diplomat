@@ -16,19 +16,17 @@ defmodule FlightDatastore.CLI do
   end
 
   defp find(opts,data,_credential) do
-    kind = opts["kind"]
-    scope = opts["scope"]
-
-    kind
-    |> FlightDatastore.find(
+    case FlightDatastore.find(
+      data["namespace"],
+      data["kind"],
       data["key"],
       data["conditions"],
       data["columns"],
-      scope
-    )
-    |> case do
-      nil -> "not found" |> puts_result(104)
-      entity -> entity |> puts_result
+      opts["scope"]
+    ) do
+      {:error, message} -> message     |> puts_result(105)
+      {:ok, nil}        -> "not found" |> puts_result(104)
+      {:ok, entity} -> entity |> puts_result
     end
   end
 
@@ -46,26 +44,20 @@ defmodule FlightDatastore.CLI do
     end
   end
 
-  defp upload(_opts,data,credential) do
-    kind = data |> Enum.reduce(nil,fn info,_acc -> info["kind"] end)
-    cols = data |> Enum.reduce([],fn info,_acc -> info |> Map.keys end)
+  defp upload(opts,data,credential) do
+    scope = opts["scope"]
 
     data
     |> Enum.map(fn info ->
       %{
-        "kind" => info["kind"],
         "action" => "insert",
+        "namespace" => info["namespace"],
+        "kind" => info["kind"],
         "key" => info["name"],
         "properties" => info,
       }
     end)
-    |> FlightDatastore.modify(%{
-      kind => %{
-        "insert" => %{
-          "cols" => cols,
-        },
-      },
-    },credential)
+    |> FlightDatastore.modify(scope,credential)
     |> case do
       {:ok, result} ->
         result.data
@@ -78,66 +70,19 @@ defmodule FlightDatastore.CLI do
     end
   end
 
-  defp bulk_insert(opts,data,_credential) do
+  defp bulk_insert(opts,data,credential) do
     src = opts["src"]
     dest = opts["dest"]
-    kind = opts["kind"]
-    keys = opts["keys"]
-    fill = opts["fill"]
+    scope = opts["scope"]
 
     data
     |> Enum.map(fn info ->
-      case open_output(dest,info["name"]) do
-        {:ok,out} ->
-          [src,info["name"]]
-          |> Path.join
-          |> File.open([:utf8])
-          |> case do
-            {:ok, file} ->
-              result = file
-              |> IO.stream(:line)
-              |> Enum.reduce(true, fn line, acc ->
-                line
-                |> parse_json
-                |> FlightDatastore.bulk_insert(kind,keys,fill,info,out)
-                |> case do
-                  :ok -> acc and true
-                  :error -> false
-                end
-              end)
-
-              file |> File.close
-              out  |> File.close
-              {:ok, result}
-
-            error -> error
-          end
-        error -> error
-      end
-      |> case do
-        {:ok, result} ->
-          if result do
-            info
-          else
-            info |> Map.put(:bulk_insert_error, info |> FlightDatastore.BulkInsert.error_kind)
-          end
+      case info |> FlightDatastore.bulk_insert(src,dest,scope,credential) do
+        {:ok, result} -> result
         {:error, message} -> message |> puts_error
       end
     end)
     |> puts_result
-  end
-  defp open_output(output,file) do
-    path = [output,file] |> Path.join
-    case File.mkdir_p(path |> Path.dirname) do
-      {:error, message} -> {:error, "failed mkdir_p: #{message} [#{path}]"}
-      _ ->
-        path
-        |> File.open([:write, :utf8])
-        |> case do
-          {:error, message} -> {:error, "failed open file: #{message} [#{path}]"}
-          result -> result
-        end
-    end
   end
 
   defp parse_data(key) do
