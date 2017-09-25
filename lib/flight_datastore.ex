@@ -3,6 +3,7 @@ defmodule FlightDatastore do
   google cloud module for getto/flight by peburrows/diplomat
   """
 
+  alias FlightDatastore.Scope
   alias FlightDatastore.Find
   alias FlightDatastore.Modify
   alias FlightDatastore.BulkInsert
@@ -12,10 +13,16 @@ defmodule FlightDatastore do
   and check conditions (return nil if check fails)
   and convert to Map
   """
-  def find(kind,key,conditions,columns,scope) do
-    Find.find_entity(kind,key)
-    |> Find.check(conditions)
-    |> Find.to_map(columns,scope)
+  def find(namespace,kind,key,conditions,columns,scope) do
+    case scope |> Scope.get(namespace,kind) do
+      nil -> {:error, :not_allowed}
+      model_scope ->
+        {:ok,
+          Find.find_entity(namespace,kind,key)
+          |> Find.check(conditions)
+          |> Find.to_map(columns,model_scope)
+        }
+    end
   end
 
 
@@ -49,15 +56,19 @@ defmodule FlightDatastore do
   Generate key and Fill data
   then insert data and output data
   """
-  def bulk_insert(data,kind,keys,fill,info,out) do
-    data = data |> BulkInsert.fill(keys,fill,info)
-    data
-    |> BulkInsert.insert(kind,info)
-    |> case do
-      :ok ->
-        out |> IO.puts(data |> Poison.encode!)
-        :ok
-      :error -> :error
+  def bulk_insert(info,src,dest,scope,credential) do
+    case scope |> Scope.get(info["namespace"],info["dataKind"]) do
+      nil ->
+        info |> BulkInsert.save_result(false,"not allowed",credential)
+        {:error, :not_allowed}
+      model_scope ->
+        case info |> BulkInsert.insert_data(src,dest,model_scope) do
+          {:ok, result} ->
+            {:ok,
+              info |> BulkInsert.save_result(result,"ok",credential)
+            }
+          error -> error
+        end
     end
   end
 end
