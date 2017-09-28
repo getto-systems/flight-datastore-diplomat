@@ -37,6 +37,8 @@ defmodule FlightDatastore.CLI do
       data["kind"],
       data["conditions"],
       data["columns"],
+      data["order_column"],
+      data["order"],
       data["limit"],
       data["offset"],
       opts["scope"]

@@ -30,11 +30,11 @@ defmodule FlightDatastore do
   execute query
   and convert to Map
   """
-  def query(namespace,kind,conditions,columns,limit,offset,scope) do
-    case Query.check(namespace,kind,conditions,limit,offset,scope) do
+  def query(namespace,kind,conditions,columns,order_column,order,limit,offset,scope) do
+    case Query.check(namespace,kind,conditions,order_column,limit,offset,scope) do
       nil -> {:error, :not_allowed}
       model_scope ->
-        case Query.execute(namespace,kind,conditions,limit,offset,model_scope) do
+        case Query.execute(namespace,kind,conditions,order_column,order,limit,offset) do
           {:error, message} -> {:error, :execute_failed, message}
           result ->
               {:ok, %{
