@@ -29,8 +29,11 @@ defmodule FlightDatastore.Scope do
       iex> FlightDatastore.Scope.get(%{"~Namespace_" => %{"Kind" => %{scope: :scope}}}, "Namespace_Suffix", "Kind")
       %{scope: :scope}
 
-      iex> FlightDatastore.Scope.get(%{"~Namespace_" => %{"~Kind_" => %{scope: :scope}}}, "Namespace_Suffix", "Kind_Suffix")
+      iex> FlightDatastore.Scope.get(%{"~Namespace_" => %{"~Kind_" => %{scope: :scope}}}, "Namespace_2017_Suffix", "Kind_2017_Suffix")
       %{scope: :scope}
+
+      iex> FlightDatastore.Scope.get(%{"~Namespace_" => %{"~Kind_" => %{scope: :scope}}}, "Namespace_ 'not allowed char exists'", "Kind_ 'not allowed char exists'")
+      nil
   """
   def get(scope,namespace,kind) do
     if namespace_scope = scope_match(scope,namespace || "_") do
@@ -42,9 +45,12 @@ defmodule FlightDatastore.Scope do
     |> Map.keys
     |> Enum.find_index(fn key ->
       case key do
-        "~" <> prefix -> match |> String.starts_with?(prefix)
-        ^match        -> true
-        _             -> false
+        "~" <> prefix ->
+          Regex.match?(~r{^[0-9a-zA-Z_]+$}, match) and
+          (match |> String.starts_with?(prefix))
+
+        ^match -> true
+        _      -> false
       end
     end)
     |> case do
