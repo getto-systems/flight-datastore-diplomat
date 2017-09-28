@@ -7,6 +7,7 @@ defmodule FlightDatastore.CLI do
 
     case args do
       ["find",        opts | _] -> opts |> parse_json |> find(data,credential)
+      ["query",       opts | _] -> opts |> parse_json |> query(data,credential)
       ["modify",      opts | _] -> opts |> parse_json |> modify(data,credential)
       ["upload",      opts | _] -> opts |> parse_json |> upload(data,credential)
       ["bulk-insert", opts | _] -> opts |> parse_json |> bulk_insert(data,credential)
@@ -27,6 +28,22 @@ defmodule FlightDatastore.CLI do
       {:error, message} -> message     |> puts_result(105)
       {:ok, nil}        -> "not found" |> puts_result(104)
       {:ok, entity} -> entity |> puts_result
+    end
+  end
+
+  defp query(opts,data,_credential) do
+    case FlightDatastore.query(
+      data["namespace"],
+      data["kind"],
+      data["conditions"],
+      data["columns"],
+      data["limit"],
+      data["offset"],
+      opts["scope"]
+    ) do
+      {:error, :not_allowed} -> "not allowed" |> puts_result(105)
+      {:error, :execute_failed, message} -> "execute failed: #{message}" |> puts_result(100)
+      {:ok, result} -> result |> puts_result
     end
   end
 

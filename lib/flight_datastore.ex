@@ -5,6 +5,7 @@ defmodule FlightDatastore do
 
   alias FlightDatastore.Scope
   alias FlightDatastore.Find
+  alias FlightDatastore.Query
   alias FlightDatastore.Modify
   alias FlightDatastore.BulkInsert
 
@@ -25,6 +26,26 @@ defmodule FlightDatastore do
     end
   end
 
+  @doc """
+  execute query
+  and convert to Map
+  """
+  def query(namespace,kind,conditions,columns,limit,offset,scope) do
+    case Query.check(namespace,kind,conditions,limit,offset,scope) do
+      nil -> {:error, :not_allowed}
+      model_scope ->
+        case Query.execute(namespace,kind,conditions,limit,offset,model_scope) do
+          {:error, message} -> {:error, :execute_failed, message}
+          result ->
+              {:ok, %{
+                result: result |> Enum.map(fn entity ->
+                  entity |> Find.to_map(columns,model_scope)
+                end),
+                count: Query.all_count(namespace,kind,conditions,model_scope),
+              }}
+        end
+    end
+  end
 
   @doc """
   check permission to modify data
