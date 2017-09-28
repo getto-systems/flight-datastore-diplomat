@@ -68,14 +68,14 @@ defmodule FlightDatastore.BulkInsert do
 
   ## Examples
 
-      iex> FlightDatastore.BulkInsert.generate_key(%{"column1" => "value1", "column2" => "value2", "column3" => "value3"}, ["column1","column2"], %{"kind" => "File", "name" => "file.txt"})
-      "File:file.txt:value1:value2"
+      iex> FlightDatastore.BulkInsert.generate_key(%{"column1" => "value1", "column2" => "value2", "column3" => "value3"}, ["column1","column2"], %{"namespace" => "Namespace", "kind" => "File", "name" => "file.txt"})
+      "Namespace:File:file.txt:value1:value2"
 
-      iex> FlightDatastore.BulkInsert.generate_key(%{"column1" => "value1", "column2" => "value2", "column3" => "value3"}, ["column_unknown"], %{"kind" => "File", "name" => "file.txt"})
-      "File:file.txt:"
+      iex> FlightDatastore.BulkInsert.generate_key(%{"column1" => "value1", "column2" => "value2", "column3" => "value3"}, ["column_unknown"], %{"namespace" => "Namespace", "kind" => "File", "name" => "file.txt"})
+      "Namespace:File:file.txt:"
 
       iex> FlightDatastore.BulkInsert.generate_key(%{"column1" => "value1", "column2" => "value2", "column3" => "value3"}, [], %{"kind" => "File", "name" => "file.txt"})
-      "File:file.txt"
+      ":File:file.txt"
   """
   def generate_key(data, keys, info) do
     [info |> file_signature | keys |> Enum.map(fn key -> data[key] end)] |> Enum.join(":")
