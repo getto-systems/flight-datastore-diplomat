@@ -40,6 +40,14 @@ defmodule FlightDatastore.Query do
     |> Diplomat.Query.execute(namespace)
   end
 
+  def keys(namespace,kind,conditions,limit,offset) do
+    select_key(kind)
+    |> where(conditions)
+    |> limit(limit,offset)
+    |> Diplomat.Query.new(conditions || %{})
+    |> Diplomat.Query.execute(namespace)
+  end
+
   def all_count(namespace,kind,conditions,scope) do
     if count(namespace,kind,conditions,0) == 0 do
       0
@@ -83,10 +91,10 @@ defmodule FlightDatastore.Query do
   end
 
   defp select_all(kind) do
-    "select * from #{kind}"
+    "select * from `#{kind}`"
   end
   defp select_key(kind) do
-    "select __key__ from #{kind}"
+    "select __key__ from `#{kind}`"
   end
   defp where(query,conditions) do
     clause = (conditions || %{})

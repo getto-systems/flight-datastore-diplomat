@@ -106,17 +106,18 @@ defmodule FlightDatastore.BulkInsert do
 
 
   def save_result(info,result,message,credential) do
-    info = info |> Map.put(:bulk_insert, %{
-      result: result,
-      message: message,
-      error: info |> error_kind,
-    })
     [%{
       "namespace" => info["namespace"],
       "kind" => info["kind"],
       "key" => info["name"],
       "action" => "update",
-      "properties" => info,
+      "properties" => %{
+        bulk_insert: %{
+          result: result,
+          message: message,
+          error: info |> error_kind,
+        },
+      },
     }]
     |> Modify.execute
 
@@ -125,11 +126,13 @@ defmodule FlightDatastore.BulkInsert do
     info
   end
 
-  defp error_kind(info) do
+  def file_column do
+    @file_column
+  end
+  def error_kind(info) do
     "#{@error_kind}:#{info |> file_signature}"
   end
-
-  defp file_signature(info) do
+  def file_signature(info) do
     "#{info["namespace"]}:#{info["kind"]}:#{info["name"]}"
   end
 end

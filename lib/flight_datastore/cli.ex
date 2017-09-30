@@ -6,11 +6,12 @@ defmodule FlightDatastore.CLI do
     credential = parse_data("FLIGHT_CREDENTIAL")
 
     case args do
-      ["find",        opts | _] -> opts |> parse_json |> find(data,credential)
-      ["query",       opts | _] -> opts |> parse_json |> query(data,credential)
-      ["modify",      opts | _] -> opts |> parse_json |> modify(data,credential)
-      ["upload",      opts | _] -> opts |> parse_json |> upload(data,credential)
-      ["bulk-insert", opts | _] -> opts |> parse_json |> bulk_insert(data,credential)
+      ["find",         opts | _] -> opts |> parse_json |> find(data,credential)
+      ["query",        opts | _] -> opts |> parse_json |> query(data,credential)
+      ["modify",       opts | _] -> opts |> parse_json |> modify(data,credential)
+      ["upload",       opts | _] -> opts |> parse_json |> upload(data,credential)
+      ["bulk-insert",  opts | _] -> opts |> parse_json |> bulk_insert(data,credential)
+      ["purge-upload", opts | _] -> opts |> parse_json |> purge_upload(data,credential)
 
       _ -> "unknown command: #{arguments |> inspect}" |> puts_error
     end
@@ -102,6 +103,15 @@ defmodule FlightDatastore.CLI do
       end
     end)
     |> puts_result
+  end
+
+  defp purge_upload(opts,data,credential) do
+    scope = opts["scope"]
+
+    case data |> FlightDatastore.purge_upload(scope,credential) do
+      {:ok, result} -> %{ status: :ok, result: result } |> puts_result
+      {:error, :not_allowed} -> "not allowed" |> puts_result(105)
+    end
   end
 
   defp parse_data(key) do
