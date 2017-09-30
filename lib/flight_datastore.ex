@@ -36,7 +36,11 @@ defmodule FlightDatastore do
       nil -> {:error, :not_allowed}
       model_scope ->
         case Query.execute(namespace,kind,conditions,order_column,order,limit,offset) do
-          {:error, message} -> {:error, :execute_failed, message}
+          {:error, status} ->
+            case status.code do
+              9 -> {:error, :not_allowed, status.message}
+              _ -> {:error, :bad_request, status.message}
+            end
           result ->
               {:ok, %{
                 result: result |> Enum.map(fn entity ->
