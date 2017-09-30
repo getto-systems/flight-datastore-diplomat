@@ -110,7 +110,12 @@ defmodule FlightDatastore.Find do
     end)
     |> Enum.reduce(%{}, fn col, acc ->
       if entity.properties[col] do
-        acc |> Map.put(col, entity.properties[col].value)
+        value =
+          case entity.properties[col].value do
+            %Diplomat.Entity{}=value -> to_map(value,value.properties |> Map.keys,%{})
+            value -> value
+          end
+        acc |> Map.put(col,value)
       else
         acc
       end

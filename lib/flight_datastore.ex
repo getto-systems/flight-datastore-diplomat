@@ -8,6 +8,7 @@ defmodule FlightDatastore do
   alias FlightDatastore.Query
   alias FlightDatastore.Modify
   alias FlightDatastore.BulkInsert
+  alias FlightDatastore.PurgeUpload
 
   @doc """
   find entity by key
@@ -90,6 +91,44 @@ defmodule FlightDatastore do
             }
           error -> error
         end
+    end
+  end
+
+  @doc """
+  Purge upload data and bulk insert data
+  """
+  def purge_upload(data,scope,credential) do
+    request =
+      data
+      |> Enum.map(fn info ->
+        Find.find_entity(info["namespace"],info["kind"],info["key"])
+        |> Find.to_map(["name","dataKind"])
+        |> Map.put("namespace", info["namespace"])
+        |> Map.put("kind", info["kind"])
+        |> Map.put("key", info["key"])
+        |> Map.put("action", "delete")
+      end)
+
+    if request |> PurgeUpload.check(scope) do
+      request
+      |> Modify.execute
+      |> case do
+        {:ok, _} ->
+          request |> Modify.log(scope, credential)
+          request
+          |> Enum.each(fn info ->
+            info |> PurgeUpload.purge
+          end)
+          {:ok, request}
+        {:error, status} ->
+          case status.code do
+            5 -> {:error, :not_found,   status.message}
+            6 -> {:error, :conflict,    status.message}
+            _ -> {:error, :bad_request, status.message}
+          end
+      end
+    else
+      {:error, :not_allowed}
     end
   end
 end
