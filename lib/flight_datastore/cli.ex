@@ -45,6 +45,7 @@ defmodule FlightDatastore.CLI do
       opts["scope"]
     ) do
       {:error, :not_allowed} -> "not allowed" |> puts_result(105)
+      {:error, :not_allowed, message} -> "not allowed: #{message}" |> puts_result(105)
       {:error, :execute_failed, message} -> "execute failed: #{message}" |> puts_result(100)
       {:ok, result} -> result |> puts_result
     end
