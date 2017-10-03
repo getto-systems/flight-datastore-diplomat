@@ -110,7 +110,7 @@ defmodule FlightDatastore.CLI do
     scope = opts["scope"]
 
     case data |> FlightDatastore.purge_upload(scope,credential) do
-      {:ok, result} -> %{ status: :ok, result: result } |> puts_result
+      {:ok, result} -> result |> puts_result
       {:error, :not_allowed} -> "not allowed" |> puts_result(105)
     end
   end
