@@ -21,26 +21,32 @@ defmodule FlightDatastore.PurgeUpload do
       iex> FlightDatastore.PurgeUpload.check([%{"namespace" => "Namespace", "kind" => "Upload", "action" => "update", "dataKind" => "Item"}], "dataKind", %{"Namespace" => %{"Upload" => %{"update" => %{}}, "Item" => %{"delete" => %{}}}})
       false
   """
-  def check(nil,_data_kind,_scopes), do: false
-  def check([],_data_kind,_scopes), do: false
-  def check(data,data_kind,scopes) do
+  def check(nil,_data_kinds,_scopes), do: false
+  def check([],_data_kinds,_scopes), do: false
+  def check(data,data_kinds,scopes) do
     data
     |> Enum.all?(fn info ->
       kind_scope = Scope.get(scopes,info["namespace"],info["kind"])
-      dataKind_scope = Scope.get(scopes,info["namespace"],info[data_kind])
-      case {kind_scope,dataKind_scope} do
-        {%{"delete" => _},%{"delete" => _}} -> true
-        _ -> false
-      end
+      data_kinds
+      |> Enum.all?(fn data_kind ->
+        dataKind_scope = Scope.get(scopes,info["namespace"],info[data_kind])
+        case {kind_scope,dataKind_scope} do
+          {%{"delete" => _},%{"delete" => _}} -> true
+          _ -> false
+        end
+      end)
     end)
   end
 
-  def purge(info,data_kind) do
+  def purge(info,data_kinds) do
     namespace = info["namespace"]
-    kind = info[data_kind]
+    data_kinds
+    |> Enum.each(fn data_kind ->
+      kind = info[data_kind]
 
-    delete_all(namespace,kind,%{BulkInsert.file_column => info |> BulkInsert.file_signature})
-    delete_all(namespace,info |> BulkInsert.error_kind,%{})
+      delete_all(namespace,kind,%{BulkInsert.file_column => info |> BulkInsert.file_signature})
+      delete_all(namespace,info |> BulkInsert.error_kind,%{})
+    end)
   end
   defp delete_all(namespace,kind,conditions) do
     keys = Query.keys(%{

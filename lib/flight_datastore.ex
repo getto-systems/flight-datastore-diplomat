@@ -106,14 +106,14 @@ defmodule FlightDatastore do
       info.data
       |> Enum.map(fn data ->
         Find.find_entity(data["namespace"],data["kind"],data["key"])
-        |> Find.to_map(["name",info.data_kind])
+        |> Find.to_map(Enum.concat(["name"],info.data_kinds))
         |> Map.put("namespace", data["namespace"])
         |> Map.put("kind", data["kind"])
         |> Map.put("key", data["key"])
         |> Map.put("action", "delete")
       end)
 
-    if request |> PurgeUpload.check(info.data_kind,info.scope) do
+    if request |> PurgeUpload.check(info.data_kinds,info.scope) do
       request
       |> Modify.execute
       |> case do
@@ -121,7 +121,7 @@ defmodule FlightDatastore do
           request |> Modify.log(info.scope, info.credential)
           request
           |> Enum.each(fn data ->
-            data |> PurgeUpload.purge(info.data_kind)
+            data |> PurgeUpload.purge(info.data_kinds)
           end)
           {:ok, request}
         {:error, status} ->

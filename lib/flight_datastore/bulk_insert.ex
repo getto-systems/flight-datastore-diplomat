@@ -8,6 +8,7 @@ defmodule FlightDatastore.BulkInsert do
   @error_kind "_Flight_BulkInsertError"
   @key_column "_bulk_insert_key"
   @file_column "_bulk_insert_file"
+  @bulk_unit 300
 
   def insert_data(info,scope) do
     case open_output(info.dest,info.data["name"]) do
@@ -16,11 +17,16 @@ defmodule FlightDatastore.BulkInsert do
           {:ok, file} ->
             result = file
             |> IO.stream(:line)
-            |> Enum.reduce(true, fn line, acc ->
-              data = line |> Poison.decode! |> fill(scope,info.data)
+            |> Enum.chunk_every(@bulk_unit)
+            |> Enum.reduce(true, fn lines, acc ->
+              data = lines |> Enum.map(fn line ->
+                line |> Poison.decode! |> fill(scope,info.data)
+              end)
               case data |> insert(info) do
                 {:ok, _response} ->
-                  out |> IO.puts(data |> Poison.encode!)
+                  data |> Enum.each(fn line ->
+                    out |> IO.puts(line |> Poison.encode!)
+                  end)
                   acc and true
                 {:error, status} ->
                   insert_error(data,status,info.data)
@@ -82,14 +88,19 @@ defmodule FlightDatastore.BulkInsert do
   end
 
   defp insert(data,info) do
-    [%{
-      "action" => info.action,
-      "namespace" => info.data["namespace"],
-      "kind" => info.data[info.data_kind],
-      "key" => data[@key_column],
-      "properties" => data,
-    }]
-    |> Modify.execute
+    data
+    |> Enum.map(fn props ->
+      %{
+        "action" => info.action,
+        "namespace" => info.data["namespace"],
+        "kind" => info.data[info.data_kind],
+        "key" => props[@key_column],
+        "properties" => props,
+      }
+    end)
+    |> Modify.to_request
+    |> Diplomat.Entity.commit_request
+    |> Diplomat.Client.commit
   end
 
   defp insert_error(data,status,info) do

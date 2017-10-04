@@ -163,9 +163,13 @@ defmodule FlightDatastore.Modify do
   end
 
   def commit(request) do
-    request
-    |> Diplomat.Entity.commit_request(:TRANSACTIONAL,Diplomat.Transaction.begin)
-    |> Diplomat.Client.commit
+    case Diplomat.Transaction.begin do
+      {:error, _}=error -> error
+      t ->
+        request
+        |> Diplomat.Entity.commit_request(:TRANSACTIONAL,t)
+        |> Diplomat.Client.commit
+    end
   end
 
   @doc """
