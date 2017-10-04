@@ -5,13 +5,13 @@ defmodule FlightDatastore.Query do
 
   alias FlightDatastore.Scope
 
-  def check(namespace,kind,conditions,order_column,limit,offset,scope) do
-    case scope |> Scope.get(namespace,kind) do
+  def check(info) do
+    case info.scope |> Scope.get(info.namespace,info.kind) do
       nil -> nil
       model_scope ->
-        if is_valid_limit(limit,offset) and
-          is_valid_order(order_column,model_scope) and
-          is_valid_conditions(conditions,model_scope)
+        if is_valid_limit(info.limit,info.offset) and
+          is_valid_order(info.order_column,model_scope) and
+          is_valid_conditions(info.conditions,model_scope)
         do
           model_scope
         end
@@ -31,62 +31,62 @@ defmodule FlightDatastore.Query do
     end)
   end
 
-  def execute(namespace,kind,conditions,order_column,order,limit,offset) do
-    select_all(kind)
-    |> where(conditions)
-    |> order_by(order_column,order)
-    |> limit(limit,offset)
-    |> Diplomat.Query.new(conditions || %{})
-    |> Diplomat.Query.execute(namespace)
+  def execute(info) do
+    select_all(info.kind)
+    |> where(info.conditions)
+    |> order_by(info.order_column,info.order)
+    |> limit(info.limit,info.offset)
+    |> Diplomat.Query.new(info.conditions || %{})
+    |> Diplomat.Query.execute(info.namespace)
   end
 
-  def keys(namespace,kind,conditions,limit,offset) do
-    select_key(kind)
-    |> where(conditions)
-    |> limit(limit,offset)
-    |> Diplomat.Query.new(conditions || %{})
-    |> Diplomat.Query.execute(namespace)
+  def keys(info) do
+    select_key(info.kind)
+    |> where(info.conditions)
+    |> limit(info.limit,info.offset)
+    |> Diplomat.Query.new(info.conditions || %{})
+    |> Diplomat.Query.execute(info.namespace)
   end
 
-  def all_count(namespace,kind,conditions,scope) do
-    if count(namespace,kind,conditions,0) == 0 do
+  def all_count(scope,info) do
+    if count(info,0) == 0 do
       0
     else
       count_unit = scope["count_unit"] || 1000
       count_max = scope["count_max"] || 100_000_000
-      max = find_max(namespace,kind,conditions,count_max,count_unit)
-      find_count(namespace,kind,conditions,(max/2), max)
+      max = find_max(info,count_max,count_unit)
+      find_count(info,(max/2), max)
     end
   end
-  defp find_max(namespace,kind,conditions,max,offset) do
+  defp find_max(info,max,offset) do
     if offset > max do
       offset
     else
-      if count(namespace,kind,conditions,offset) > 0 do
-        find_max(namespace,kind,conditions,max,offset * 10)
+      if count(info,offset) > 0 do
+        find_max(info,max,offset * 10)
       else
         offset
       end
     end
   end
-  defp find_count(namespace,kind,conditions,offset,max) do
+  defp find_count(info,offset,max) do
     if max - offset < 0.5 do
       max |> round
     else
-      if count(namespace,kind,conditions,offset |> round) > 0 do
-        find_count(namespace,kind,conditions,offset + ((max - offset)/2),max)
+      if count(info,offset |> round) > 0 do
+        find_count(info,offset + ((max - offset)/2),max)
       else
-        find_count(namespace,kind,conditions,offset - ((max - offset)/2),offset)
+        find_count(info,offset - ((max - offset)/2),offset)
       end
     end
   end
 
-  defp count(namespace,kind,conditions,offset) do
-    select_key(kind)
-    |> where(conditions)
+  defp count(info,offset) do
+    select_key(info.kind)
+    |> where(info.conditions)
     |> limit(1,offset)
-    |> Diplomat.Query.new(conditions || %{})
-    |> Diplomat.Query.execute(namespace)
+    |> Diplomat.Query.new(info.conditions || %{})
+    |> Diplomat.Query.execute(info.namespace)
     |> Enum.count
   end
 

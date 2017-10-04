@@ -9,21 +9,21 @@ defmodule FlightDatastore.BulkInsert do
   @key_column "_bulk_insert_key"
   @file_column "_bulk_insert_file"
 
-  def insert_data(info,src,dest,scope) do
-    case open_output(dest,info["name"]) do
+  def insert_data(info,scope) do
+    case open_output(info.dest,info.data["name"]) do
       {:ok,out} ->
-        case open_input(src,info["name"]) do
+        case open_input(info.src,info.data["name"]) do
           {:ok, file} ->
             result = file
             |> IO.stream(:line)
             |> Enum.reduce(true, fn line, acc ->
-              data = line |> Poison.decode! |> fill(scope,info)
+              data = line |> Poison.decode! |> fill(scope,info.data)
               case data |> insert(info) do
                 {:ok, _response} ->
                   out |> IO.puts(data |> Poison.encode!)
                   acc and true
                 {:error, status} ->
-                  insert_error(data,status,info)
+                  insert_error(data,status,info.data)
                   false
               end
             end)
@@ -83,9 +83,9 @@ defmodule FlightDatastore.BulkInsert do
 
   defp insert(data,info) do
     [%{
-      "action" => "insert",
-      "namespace" => info["namespace"],
-      "kind" => info["dataKind"],
+      "action" => info.action,
+      "namespace" => info.data["namespace"],
+      "kind" => info.data[info.data_kind],
       "key" => data[@key_column],
       "properties" => data,
     }]
@@ -105,25 +105,25 @@ defmodule FlightDatastore.BulkInsert do
   end
 
 
-  def save_result(info,result,message,credential) do
+  def save_result(info,result,message) do
     [%{
-      "namespace" => info["namespace"],
-      "kind" => info["kind"],
-      "key" => info["name"],
+      "namespace" => info.data["namespace"],
+      "kind" => info.data["kind"],
+      "key" => info.data["name"],
       "action" => "update",
       "properties" => %{
-        bulk_insert: %{
+        "bulk_insert_#{info.data_kind}" => %{
           result: result,
           message: message,
-          error: info |> error_kind,
+          error: info.data |> error_kind,
         },
       },
     }]
     |> Modify.execute
 
-    info |> Modify.log(credential)
+    info |> Modify.log(info.credential)
 
-    info
+    info.data
   end
 
   def file_column do
