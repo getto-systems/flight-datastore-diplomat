@@ -99,7 +99,7 @@ defmodule FlightDatastore.Modify do
   def fill_properties(data) do
     data
     |> Enum.map(fn info ->
-      unless ["key","properties"] |> Enum.all?(fn key -> info |> Map.has_key?(key) end) do
+      unless info |> fill? do
         info
       else
         case Find.find_entity(info["namespace"], info["kind"], info["key"]) do
@@ -113,6 +113,13 @@ defmodule FlightDatastore.Modify do
         end
       end
     end)
+  end
+  defp fill?(info) do
+    if info["action"] == "insert" || info["action"] == "delete" do
+      false
+    else
+      ["key","properties"] |> Enum.all?(fn key -> info |> Map.has_key?(key) end)
+    end
   end
 
   @doc """

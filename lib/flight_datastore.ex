@@ -15,14 +15,14 @@ defmodule FlightDatastore do
   and check conditions (return nil if check fails)
   and convert to Map
   """
-  def find(namespace,kind,key,conditions,columns,scope) do
-    case scope |> Scope.get(namespace,kind) do
+  def find(info) do
+    case info.scope |> Scope.get(info.namespace,info.kind) do
       nil -> {:error, :not_allowed}
       model_scope ->
         {:ok,
-          Find.find_entity(namespace,kind,key)
-          |> Find.check(conditions)
-          |> Find.to_map(columns,model_scope)
+          Find.find_entity(info.namespace,info.kind,info.key)
+          |> Find.check(info.conditions)
+          |> Find.to_map(info.columns,model_scope)
         }
     end
   end
@@ -31,11 +31,11 @@ defmodule FlightDatastore do
   execute query
   and convert to Map
   """
-  def query(namespace,kind,conditions,columns,order_column,order,limit,offset,scope) do
-    case Query.check(namespace,kind,conditions,order_column,limit,offset,scope) do
+  def query(info) do
+    case Query.check(info) do
       nil -> {:error, :not_allowed}
       model_scope ->
-        case Query.execute(namespace,kind,conditions,order_column,order,limit,offset) do
+        case Query.execute(info) do
           {:error, status} ->
             case status.code do
               9 -> {:error, :not_allowed, status.message}
@@ -44,9 +44,9 @@ defmodule FlightDatastore do
           result ->
               {:ok, %{
                 result: result |> Enum.map(fn entity ->
-                  entity |> Find.to_map(columns,model_scope)
+                  entity |> Find.to_map(info.columns,model_scope)
                 end),
-                count: Query.all_count(namespace,kind,conditions,model_scope),
+                count: model_scope |> Query.all_count(info),
               }}
         end
     end
@@ -56,15 +56,15 @@ defmodule FlightDatastore do
   check permission to modify data
   and execute modify
   """
-  def modify(data,scopes,credential) do
-    if data |> Modify.check(scopes,credential) do
-      data
+  def modify(info) do
+    if info.data |> Modify.check(info.scope,info.credential) do
+      info.data
       |> Modify.execute
       |> case do
         {:ok, response} ->
           keys = response |> Modify.inserted_keys
-          filled = data |> Modify.fill_keys(keys)
-          filled |> Modify.log(scopes, credential)
+          filled = info.data |> Modify.fill_keys(keys)
+          filled |> Modify.log(info.scope, info.credential)
           {:ok, %{keys: keys, data: filled}}
         {:error, status} ->
           case status.code do
@@ -82,16 +82,16 @@ defmodule FlightDatastore do
   Generate key and Fill data
   then insert data and output data
   """
-  def bulk_insert(info,src,dest,scope,credential) do
-    case scope |> Scope.get(info["namespace"],info["dataKind"]) do
+  def bulk_insert(info) do
+    case info.scope |> Scope.get(info.data["namespace"],info.data[info.data_kind]) do
       nil ->
-        info |> BulkInsert.save_result(false,"not allowed",credential)
+        info |> BulkInsert.save_result(false,"not allowed")
         {:error, :not_allowed}
       model_scope ->
-        case info |> BulkInsert.insert_data(src,dest,model_scope) do
+        case info |> BulkInsert.insert_data(model_scope) do
           {:ok, result} ->
             {:ok,
-              info |> BulkInsert.save_result(result,"ok",credential)
+              info |> BulkInsert.save_result(result,"ok")
             }
           error -> error
         end
@@ -101,27 +101,27 @@ defmodule FlightDatastore do
   @doc """
   Purge upload data and bulk insert data
   """
-  def purge_upload(data,scope,credential) do
+  def purge_upload(info) do
     request =
-      data
-      |> Enum.map(fn info ->
-        Find.find_entity(info["namespace"],info["kind"],info["key"])
-        |> Find.to_map(["name","dataKind"])
-        |> Map.put("namespace", info["namespace"])
-        |> Map.put("kind", info["kind"])
-        |> Map.put("key", info["key"])
+      info.data
+      |> Enum.map(fn data ->
+        Find.find_entity(data["namespace"],data["kind"],data["key"])
+        |> Find.to_map(["name",info.data_kind])
+        |> Map.put("namespace", data["namespace"])
+        |> Map.put("kind", data["kind"])
+        |> Map.put("key", data["key"])
         |> Map.put("action", "delete")
       end)
 
-    if request |> PurgeUpload.check(scope) do
+    if request |> PurgeUpload.check(info.data_kind,info.scope) do
       request
       |> Modify.execute
       |> case do
         {:ok, _} ->
-          request |> Modify.log(scope, credential)
+          request |> Modify.log(info.scope, info.credential)
           request
-          |> Enum.each(fn info ->
-            info |> PurgeUpload.purge
+          |> Enum.each(fn data ->
+            data |> PurgeUpload.purge(info.data_kind)
           end)
           {:ok, request}
         {:error, status} ->

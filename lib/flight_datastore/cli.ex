@@ -18,14 +18,14 @@ defmodule FlightDatastore.CLI do
   end
 
   defp find(opts,data,_credential) do
-    case FlightDatastore.find(
-      data["namespace"],
-      data["kind"],
-      data["key"],
-      data["conditions"],
-      data["columns"],
-      opts["scope"]
-    ) do
+    case FlightDatastore.find(%{
+      namespace: data["namespace"],
+      kind: data["kind"],
+      key: data["key"],
+      conditions: data["conditions"],
+      columns: data["columns"],
+      scope: opts["scope"],
+    }) do
       {:error, message} -> message     |> puts_result(105)
       {:ok, nil}        -> "not found" |> puts_result(104)
       {:ok, entity} -> entity |> puts_result
@@ -33,17 +33,17 @@ defmodule FlightDatastore.CLI do
   end
 
   defp query(opts,data,_credential) do
-    case FlightDatastore.query(
-      data["namespace"],
-      data["kind"],
-      data["conditions"],
-      data["columns"],
-      data["order_column"],
-      data["order"],
-      data["limit"],
-      data["offset"],
-      opts["scope"]
-    ) do
+    case FlightDatastore.query(%{
+      namespace: data["namespace"],
+      kind: data["kind"],
+      conditions: data["conditions"],
+      columns: data["columns"],
+      order_column: data["order_column"],
+      order: data["order"],
+      limit: data["limit"],
+      offset: data["offset"],
+      scope: opts["scope"],
+    }) do
       {:error, :not_allowed} -> "not allowed" |> puts_result(105)
       {:error, :not_allowed, message} -> "not allowed: #{message}" |> puts_result(105)
       {:error, :execute_failed, message} -> "execute failed: #{message}" |> puts_result(100)
@@ -52,11 +52,11 @@ defmodule FlightDatastore.CLI do
   end
 
   defp modify(opts,data,credential) do
-    scope = opts["scope"]
-
-    data
-    |> FlightDatastore.modify(scope,credential)
-    |> case do
+    case FlightDatastore.modify(%{
+      data: data,
+      scope: opts["scope"],
+      credential: credential,
+    }) do
       {:ok, result} -> result |> puts_result
       {:error, :not_allowed} -> "not allowed" |> puts_result(105)
       {:error, :bad_request, message} -> "bad request: #{message}" |> puts_result(100)
@@ -66,20 +66,20 @@ defmodule FlightDatastore.CLI do
   end
 
   defp upload(opts,data,credential) do
-    scope = opts["scope"]
-
-    data
-    |> Enum.map(fn info ->
-      %{
-        "action" => "insert",
-        "namespace" => info["namespace"],
-        "kind" => info["kind"],
-        "key" => info["name"],
-        "properties" => info,
-      }
-    end)
-    |> FlightDatastore.modify(scope,credential)
-    |> case do
+    case FlightDatastore.modify(%{
+      data: data
+        |> Enum.map(fn info ->
+          %{
+            "action" => "insert",
+            "namespace" => info["namespace"],
+            "kind" => info["kind"],
+            "key" => info["name"],
+            "properties" => info,
+          }
+        end),
+      scope: opts["scope"],
+      credential: credential,
+    }) do
       {:ok, result} ->
         result.data
         |> Enum.map(fn entity -> entity["properties"] end)
@@ -92,13 +92,17 @@ defmodule FlightDatastore.CLI do
   end
 
   defp bulk_insert(opts,data,credential) do
-    src = opts["src"]
-    dest = opts["dest"]
-    scope = opts["scope"]
-
     data
     |> Enum.map(fn info ->
-      case info |> FlightDatastore.bulk_insert(src,dest,scope,credential) do
+      case FlightDatastore.bulk_insert(%{
+        data: info,
+        src: opts["src"],
+        dest: opts["dest"],
+        action: opts["action"] || "insert",
+        data_kind: opts["data"],
+        scope: opts["scope"],
+        credential: credential
+      }) do
         {:ok, result} -> result
         {:error, message} -> message |> puts_error
       end
@@ -107,9 +111,12 @@ defmodule FlightDatastore.CLI do
   end
 
   defp purge_upload(opts,data,credential) do
-    scope = opts["scope"]
-
-    case data |> FlightDatastore.purge_upload(scope,credential) do
+    case FlightDatastore.purge_upload(%{
+      data: data,
+      data_kind: opts["data"],
+      scope: opts["scope"],
+      credential: credential
+    }) do
       {:ok, result} -> result |> puts_result
       {:error, :not_allowed} -> "not allowed" |> puts_result(105)
     end
