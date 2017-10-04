@@ -113,7 +113,7 @@ defmodule FlightDatastore.CLI do
   defp purge_upload(opts,data,credential) do
     case FlightDatastore.purge_upload(%{
       data: data,
-      data_kind: opts["data"],
+      data_kinds: opts["data"],
       scope: opts["scope"],
       credential: credential
     }) do
