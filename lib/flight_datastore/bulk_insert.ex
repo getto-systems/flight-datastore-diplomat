@@ -22,8 +22,8 @@ defmodule FlightDatastore.BulkInsert do
               data = lines |> parse(info,scope)
               case data |> insert do
                 {:ok, _response} ->
-                  data |> Enum.each(fn line ->
-                    out |> IO.puts(line |> Poison.encode!)
+                  data |> Enum.each(fn info ->
+                    out |> IO.puts(info["properties"] |> Poison.encode!)
                   end)
                   acc and true
                 {:error, status} ->
