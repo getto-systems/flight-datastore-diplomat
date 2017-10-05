@@ -73,7 +73,7 @@ defmodule FlightDatastore.CLI do
             "action" => "insert",
             "namespace" => info["namespace"],
             "kind" => info["kind"],
-            "key" => info["name"],
+            "key" => info["key"],
             "properties" => info,
           }
         end),

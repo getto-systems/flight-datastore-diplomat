@@ -19,10 +19,8 @@ defmodule FlightDatastore.BulkInsert do
             |> IO.stream(:line)
             |> Enum.chunk_every(@bulk_unit)
             |> Enum.reduce(true, fn lines, acc ->
-              data = lines |> Enum.map(fn line ->
-                line |> Poison.decode! |> fill(scope,info.data)
-              end)
-              case data |> insert(info) do
+              data = lines |> parse(info,scope)
+              case data |> insert do
                 {:ok, _response} ->
                   data |> Enum.each(fn line ->
                     out |> IO.puts(line |> Poison.encode!)
@@ -62,13 +60,6 @@ defmodule FlightDatastore.BulkInsert do
   end
 
 
-  defp fill(data, scope, info) do
-    # TODO fill data
-    data
-    |> Map.put(@key_column, generate_key(data, scope["keys"], info))
-    |> Map.put(@file_column, info |> file_signature)
-  end
-
   @doc """
   Generate key
 
@@ -87,9 +78,10 @@ defmodule FlightDatastore.BulkInsert do
     [info |> file_signature | keys |> Enum.map(fn key -> data[key] end)] |> Enum.join(":")
   end
 
-  defp insert(data,info) do
-    data
-    |> Enum.map(fn props ->
+  defp parse(lines,info,scope) do
+    lines
+    |> Enum.map(fn line ->
+      props = line |> Poison.decode! |> fill(scope,info.data)
       %{
         "action" => info.action,
         "namespace" => info.data["namespace"],
@@ -98,9 +90,17 @@ defmodule FlightDatastore.BulkInsert do
         "properties" => props,
       }
     end)
+  end
+  defp insert(data) do
+    data
     |> Modify.to_request
     |> Diplomat.Entity.commit_request
     |> Diplomat.Client.commit
+  end
+  defp fill(data, scope, info) do
+    data
+    |> Map.put(@key_column, generate_key(data, scope["keys"], info))
+    |> Map.put(@file_column, info |> file_signature)
   end
 
   defp insert_error(data,status,info) do
@@ -120,7 +120,7 @@ defmodule FlightDatastore.BulkInsert do
     [%{
       "namespace" => info.data["namespace"],
       "kind" => info.data["kind"],
-      "key" => info.data["name"],
+      "key" => info.data["key"],
       "action" => "update",
       "properties" => %{
         "bulk_insert_#{info.data_kind}" => %{
