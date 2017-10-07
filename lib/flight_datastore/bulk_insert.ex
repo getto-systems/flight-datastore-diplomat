@@ -27,7 +27,7 @@ defmodule FlightDatastore.BulkInsert do
                   end)
                   acc and true
                 {:error, status} ->
-                  insert_error(data,status,info.data)
+                  insert_error(status,info.data)
                   false
               end
             end)
@@ -98,17 +98,20 @@ defmodule FlightDatastore.BulkInsert do
     |> Diplomat.Client.commit
   end
   defp fill(data, scope, info) do
-    data
-    |> Map.put(@key_column, generate_key(data, scope["keys"], info))
-    |> Map.put(@file_column, info |> file_signature)
+    (scope["fill_cols"] || [])
+    |> Enum.reduce(%{},fn col,acc -> acc |> Map.put(col, info[col]) end)
+    |> Map.merge(
+      data
+      |> Map.put(@key_column, generate_key(data, scope["keys"], info))
+      |> Map.put(@file_column, info |> file_signature)
+    )
   end
 
-  defp insert_error(data,status,info) do
+  defp insert_error(status,info) do
     [%{
       "kind" => info |> error_kind,
       "action" => "insert",
       "properties" => %{
-        "data" => data,
         "message" => status.message,
       },
     }]
